@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiple Resume Upload</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .drop-zone {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            background-color: #fff;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        .drop-zone.dragover {
+            border-color: #007bff;
+        }
+        .drop-zone p {
+            margin: 0;
+            font-size: 18px;
+            color: #666;
+        }
+        #uploadButton, #exportButton {
+            display: block;
+            width: 100%;
+            max-width: 200px;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #uploadButton:hover, #exportButton:hover {
+            background-color: #0056b3;
+        }
+        .response-section {
+            background-color: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+        }
+        .response-section h2 {
+            margin-top: 0;
+            font-size: 22px;
+            color: #333;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            font-size: 16px;
+        }
+        th {
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        .sub-table th, .sub-table td {
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <h1>Upload Multiple Resumes</h1>
+    <div class="drop-zone" id="dropZone">
+        <p>Drag and drop files here or click to select</p>
+    </div>
+    <input type="file" id="resumeInput" multiple style="display: none;">
+    <button id="uploadButton">Upload</button>
+    <button id="exportButton" style="display: none;">Export to Excel</button>
+    <div id="responseContainer"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.1/xlsx.full.min.js"></script>
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('resumeInput');
+        const uploadButton = document.getElementById('uploadButton');
+        const exportButton = document.getElementById('exportButton');
+        const responseContainer = document.getElementById('responseContainer');
+        let responses = [];
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+        uploadButton.addEventListener('click', async () => {
+            responseContainer.innerHTML = '';
+            const files = fileInput.files;
+
+            for (const file of files) {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const response = await fetch('https://foxsense.keka.com/careers/api/resumeparser/default/2', {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Error: ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+                    responses.push({ fileName: file.name, data });
+                    displayResponse(file.name, data);
+                } catch (error) {
+                    responseContainer.innerHTML += `<p>Error uploading ${file.name}: ${error.message}</p>`;
+                }
+            }
+            if (responses.length > 0) {
+                exportButton.style.display = 'block';
+            }
+        });
+
+        exportButton.addEventListener('click', () => {
+    const wb = XLSX.utils.book_new();
+    const wsData = [];
+    let serialNumber = 1; // Initialize serial number
+
+    responses.forEach(({ fileName, data }, index) => {
+        const candidateProfile = data.candidateProfile;
+        const educationDetails = candidateProfile.educationDetails.map(ed => `${ed.degree} (${ed.branch}) - ${ed.university} (${ed.location})`).join('\n');
+        const experienceDetails = candidateProfile.experienceDetails.map(ed => `${ed.designation} at ${ed.companyName} (${ed.location}) from ${ed.dateOfJoining.split('T')[0]} to ${ed.dateOfRelieving.split('T')[0]}`).join(', ');
+        const skills = candidateProfile.skills.map(skill => `${skill.name}`).join(', ');
+
+        
+        wsData.push([
+            index + 1,
+            fileName,
+            candidateProfile.displayName,
+            candidateProfile.firstName,
+            candidateProfile.middleName,
+            candidateProfile.lastName,
+            candidateProfile.email,
+            `${candidateProfile.mobilePhone.countryCode}${candidateProfile.mobilePhone.number}`,
+            candidateProfile.standardFields.currentLocation ? candidateProfile.standardFields.currentLocation.answer : '',
+            candidateProfile.standardFields.workExperience ? `${JSON.parse(candidateProfile.standardFields.workExperience.answer).Years} years, ${JSON.parse(candidateProfile.standardFields.workExperience.answer).Months} months` : '',
+            educationDetails,
+            experienceDetails,
+            skills
+        ]);
+    });
+
+    
+    wsData.unshift(['S.No', 'File Name', 'Full Name', 'First Name', 'Middle Name', 'Last Name', 'Email', 'Mobile', 'Current Location', 'Work Experience', 'Education Details', 'Experience Details', 'Skills']);
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    XLSX.utils.book_append_sheet(wb, ws, "Resumes");
+    XLSX.writeFile(wb, 'resumes.xlsx');
+});
+
+
+        function handleFiles(files) {
+            fileInput.files = files;
+            dropZone.innerHTML = `${files.length} file(s) selected`;
+        }
+
+        function displayResponse(fileName, data)
+{
+            const section = document.createElement('div');
+            section.className = 'response-section';
+            const candidateProfile = data.candidateProfile;
+            const currentLocation = candidateProfile.standardFields.currentLocation ? candidateProfile.standardFields.currentLocation.answer : 'N/A';
+            const workExperience = candidateProfile.standardFields.workExperience ? `${JSON.parse(candidateProfile.standardFields.workExperience.answer).Years} years, ${JSON.parse(candidateProfile.standardFields.workExperience.answer).Months} months` : 'N/A';
+            const educationDetails = candidateProfile.educationDetails.map(ed => `${ed.degree} (${ed.branch}) - ${ed.university} (${ed.location})`).join('<br>');
+            const experienceDetails = candidateProfile.experienceDetails.map(ed => `${ed.designation} at ${ed.companyName} (${ed.location}) from ${ed.dateOfJoining.split('T')[0]} to ${ed.dateOfRelieving.split('T')[0]}`).join(', ');
+            const skills = candidateProfile.skills.map(skill => `${skill.name}`).join(', ');
+
+            section.innerHTML = `
+                <h2>File: ${fileName}</h2>
+                <table>
+                    <tr><th>Full Name</th><td>${candidateProfile.displayName}</td></tr>
+                    <tr><th>First Name</th><td>${candidateProfile.firstName}</td></tr>
+                    <tr><th>Middle Name</th><td>${candidateProfile.middleName}</td></tr>
+                    <tr><th>Last Name</th><td>${candidateProfile.lastName}</td></tr>
+                    <tr><th>Email</th><td>${candidateProfile.email}</td></tr>
+                    <tr><th>Mobile</th><td>${candidateProfile.mobilePhone.countryCode}${candidateProfile.mobilePhone.number}</td></tr>
+                    <tr><th>Current Location</th><td>${currentLocation}</td></tr>
+                    <tr><th>Work Experience</th><td>${workExperience}</td></tr>
+                    <tr><th>Education Details</th><td>${educationDetails}</td></tr>
+                    <tr><th>Experience Details</th><td>${experienceDetails}</td></tr>
+                    <tr><th>Skills</th><td>${skills}</td></tr>
+                </table>
+            `;
+            responseContainer.appendChild(section);
+        }
+    </script>
+</body>
+</html>
