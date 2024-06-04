@@ -160,27 +160,23 @@ exportButton.addEventListener('click', () => {
     const wsData = [];
     let serialNumber = 1; // Initialize serial number
 
-    responses.forEach(({ fileName, data }, index) => {
-        const candidateProfile = data.candidateProfile;
-        const educationDetails = candidateProfile.educationDetails.map(ed => `${ed.degree} (${ed.branch}) - ${ed.university} (${ed.location})`).join('\n');
-        const experienceDetails = candidateProfile.experienceDetails.map(ed => `${ed.designation} at ${ed.companyName} (${ed.location}) from ${ed.dateOfJoining.split('T')[0]} to ${ed.dateOfRelieving.split('T')[0]}`).join(', ');
-        const skills = candidateProfile.skills.map(skill => `${skill.name}`).join(', ');
+    const responseSections = document.querySelectorAll('.response-section');
 
-        wsData.push([
-            index + 1,
-            fileName,
-            candidateProfile.displayName,
-            candidateProfile.firstName,
-            candidateProfile.middleName,
-            candidateProfile.lastName,
-            candidateProfile.email,
-            `${candidateProfile.mobilePhone.countryCode}${candidateProfile.mobilePhone.number}`,
-            candidateProfile.standardFields.currentLocation ? candidateProfile.standardFields.currentLocation.answer : '',
-            candidateProfile.standardFields.workExperience ? `${JSON.parse(candidateProfile.standardFields.workExperience.answer).Years} years, ${JSON.parse(candidateProfile.standardFields.workExperience.answer).Months} months` : '',
-            educationDetails,
-            experienceDetails,
-            skills
-        ]);
+    responseSections.forEach((section, index) => {
+        const fileName = section.querySelector('h2').textContent.replace('File: ', '');
+        const tableRows = section.querySelectorAll('table tr');
+
+        const rowData = [];
+
+        tableRows.forEach((row, rowIndex) => {
+            if (rowIndex === 0) return; // Skip header row
+
+            const cells = row.querySelectorAll('td');
+            const cellValues = Array.from(cells).map(cell => cell.textContent.trim());
+            rowData.push(...cellValues);
+        });
+
+        wsData.push([index + 1, fileName, ...rowData]);
     });
 
     wsData.unshift(['S.No', 'File Name', 'Full Name', 'First Name', 'Middle Name', 'Last Name', 'Email', 'Mobile', 'Current Location', 'Work Experience', 'Education Details', 'Experience Details', 'Skills']);
@@ -208,17 +204,17 @@ function displayResponse(fileName, data) {
     section.innerHTML = `
         <h2>File: ${fileName}</h2>
         <table>
-            <tr><th>Full Name</th><td>${candidateProfile.displayName}</td></tr>
-            <tr><th>First Name</th><td>${candidateProfile.firstName}</td></tr>
-            <tr><th>Middle Name</th><td>${candidateProfile.middleName}</td></tr>
-            <tr><th>Last Name</th><td>${candidateProfile.lastName}</td></tr>
-            <tr><th>Email</th><td>${candidateProfile.email}</td></tr>
-            <tr><th>Mobile</th><td>${candidateProfile.mobilePhone.countryCode}${candidateProfile.mobilePhone.number}</td></tr>
-            <tr><th>Current Location</th><td>${currentLocation}</td></tr>
-            <tr><th>Work Experience</th><td>${workExperience}</td></tr>
-            <tr><th>Education Details</th><td>${educationDetails}</td></tr>
-            <tr><th>Experience Details</th><td>${experienceDetails}</td></tr>
-            <tr><th>Skills</th><td>${skills}</td></tr>
+            <tr><th>Full Name</th><td contenteditable="true">${candidateProfile.displayName}</td></tr>
+            <tr><th>First Name</th><td contenteditable="true">${candidateProfile.firstName}</td></tr>
+            <tr><th>Middle Name</th><td contenteditable="true">${candidateProfile.middleName}</td></tr>
+            <tr><th>Last Name</th><td contenteditable="true">${candidateProfile.lastName}</td></tr>
+            <tr><th>Email</th><td contenteditable="true">${candidateProfile.email}</td></tr>
+            <tr><th>Mobile</th><td contenteditable="true">${candidateProfile.mobilePhone.countryCode}${candidateProfile.mobilePhone.number}</td></tr>
+            <tr><th>Current Location</th><td contenteditable="true">${currentLocation}</td></tr>
+            <tr><th>Work Experience</th><td contenteditable="true">${workExperience}</td></tr>
+            <tr><th>Education Details</th><td contenteditable="true">${educationDetails}</td></tr>
+            <tr><th>Experience Details</th><td contenteditable="true">${experienceDetails}</td></tr>
+            <tr><th>Skills</th><td contenteditable="true">${skills}</td></tr>
         </table>
     `;
     responseContainer.appendChild(section);
